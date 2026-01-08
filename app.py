@@ -151,6 +151,78 @@ def main():
             help="Exclude Sunday records from analysis"
         )
     
+    # Alignment and output options
+    with st.sidebar.expander("⚙️ Alignment & Output Options", expanded=True):
+        st.markdown("**Index Offsets (for alignment with existing dataset)**")
+        
+        x_offset = st.number_input(
+            "x_grid offset",
+            value=2,
+            min_value=-5,
+            max_value=5,
+            help="Add this value to x_grid indices (recommended: 2)"
+        )
+        
+        y_offset = st.number_input(
+            "y_grid offset",
+            value=1,
+            min_value=-5,
+            max_value=5,
+            help="Add this value to y_grid indices (recommended: 1)"
+        )
+        
+        t_offset = st.number_input(
+            "time offset",
+            value=1,
+            min_value=-5,
+            max_value=5,
+            help="Add this value to time indices (recommended: 1 for 1-based)"
+        )
+        
+        st.divider()
+        
+        generate_dense = st.checkbox(
+            "Generate Dense Dataset",
+            value=True,
+            help="Include zero entries for all grid cells (matches existing dataset format)"
+        )
+        
+        include_saturday = st.checkbox(
+            "Include Saturday with Zeros",
+            value=False,
+            help="Add Saturday (day 6) entries with zero counts if missing in data"
+        )
+        
+        st.divider()
+        st.markdown("**Grid Max Values (for dense generation)**")
+        st.caption("Override empirical max values to match existing dataset dimensions")
+        
+        use_explicit_grid_max = st.checkbox(
+            "Use Explicit Grid Max Values",
+            value=False,
+            help="Enable to set fixed max values instead of using data-derived values"
+        )
+        
+        if use_explicit_grid_max:
+            x_grid_max = st.number_input(
+                "x_grid Max",
+                value=48,
+                min_value=1,
+                max_value=100,
+                help="Maximum x_grid value (existing dataset uses 48)"
+            )
+            
+            y_grid_max = st.number_input(
+                "y_grid Max",
+                value=90,
+                min_value=1,
+                max_value=150,
+                help="Maximum y_grid value (existing dataset uses 90)"
+            )
+        else:
+            x_grid_max = None
+            y_grid_max = None
+    
     # Main content tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Process Data", 
@@ -245,6 +317,13 @@ Session state keys: {list(st.session_state.keys())}
                 grid_size=grid_size,
                 time_interval=time_interval,
                 exclude_sunday=exclude_sunday,
+                x_grid_offset=x_offset,
+                y_grid_offset=y_offset,
+                time_offset=t_offset,
+                generate_dense=generate_dense,
+                include_saturday_zeros=include_saturday,
+                x_grid_max=x_grid_max,
+                y_grid_max=y_grid_max,
                 raw_data_dir=raw_data_path,
                 output_dir=Path(output_dir)
             )
@@ -1242,7 +1321,7 @@ Session state keys: {list(st.session_state.keys())}
     st.sidebar.markdown("""
     ---
     **Pickup/Dropoff Counts Processor**  
-    Part of the FAMAIL project
+    FaMAIL Project - San Diego State University - 2026
     """)
 
 

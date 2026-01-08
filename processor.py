@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Tuple, Optional, List
 from dataclasses import dataclass
+from itertools import product
 
 
 @dataclass
@@ -20,6 +21,20 @@ class ProcessingConfig:
     grid_size: float = 0.01  # degrees
     time_interval: int = 5   # minutes (288 buckets per day)
     exclude_sunday: bool = True
+    
+    # Index offsets for alignment with existing dataset
+    x_grid_offset: int = 2  # Add 2 to x_grid indices
+    y_grid_offset: int = 1  # Add 1 to y_grid indices
+    time_offset: int = 1    # Add 1 to time indices (0-based -> 1-based)
+    
+    # Dense dataset generation
+    generate_dense: bool = True  # Include zero entries for all grid cells
+    include_saturday_zeros: bool = False  # Include Saturday (day 6) with zeros
+    
+    # Explicit grid max values (for alignment with existing dataset)
+    # When set (not None), these override the empirical max from data
+    x_grid_max: Optional[int] = None  # Set to 48 to match existing dataset
+    y_grid_max: Optional[int] = None  # Set to 90 to match existing dataset
     
     # Paths
     raw_data_dir: Path = Path(__file__).parent.parent / "raw_data"
@@ -323,12 +338,13 @@ def process_data(
         bounds,
         config.grid_size
     )
-    combined_df['x_grid'] = x_grid
-    combined_df['y_grid'] = y_grid
+    # Apply offsets for alignment with existing dataset
+    combined_df['x_grid'] = x_grid + config.x_grid_offset
+    combined_df['y_grid'] = y_grid + config.y_grid_offset
     
     # Stage 6: Apply temporal quantization
     update_progress("Applying temporal quantization...", 0.5)
-    combined_df['time'] = timestamp_to_time_bin(combined_df['timestamp'])
+    combined_df['time'] = timestamp_to_time_bin(combined_df['timestamp']) + config.time_offset
     
     # Stage 7: Detect transitions
     update_progress("Detecting pickup/dropoff transitions...", 0.6)
@@ -366,6 +382,53 @@ def process_data(
     
     merged['pickup_count'] = merged['pickup_count'].astype(int)
     merged['dropoff_count'] = merged['dropoff_count'].astype(int)
+    
+    # Stage 11: Generate dense dataset if requested
+    if config.generate_dense:
+        update_progress("Generating dense dataset...", 0.95)
+        
+        # Determine grid ranges from data (empirical)
+        x_min_empirical, x_max_empirical = int(combined_df['x_grid'].min()), int(combined_df['x_grid'].max())
+        y_min_empirical, y_max_empirical = int(combined_df['y_grid'].min()), int(combined_df['y_grid'].max())
+        time_min, time_max = int(combined_df['time'].min()), int(combined_df['time'].max())
+        
+        # Use explicit max values if configured, otherwise use empirical
+        x_min = x_min_empirical
+        x_max = config.x_grid_max if config.x_grid_max is not None else x_max_empirical
+        y_min = y_min_empirical
+        y_max = config.y_grid_max if config.y_grid_max is not None else y_max_empirical
+        
+        # Determine day range
+        existing_days = sorted(combined_df['day'].unique())
+        if config.include_saturday_zeros and 6 not in existing_days:
+            # Add Saturday (day 6) to the list
+            all_days = existing_days + [6]
+        else:
+            all_days = existing_days
+        
+        # Create all possible combinations
+        all_keys = list(product(
+            range(x_min, x_max + 1),
+            range(y_min, y_max + 1),
+            range(time_min, time_max + 1),
+            all_days
+        ))
+        
+        # Create dense DataFrame with all combinations
+        dense_df = pd.DataFrame(all_keys, columns=['x_grid', 'y_grid', 'time', 'day'])
+        
+        # Merge with actual counts (left join to keep all dense keys)
+        dense_merged = pd.merge(
+            dense_df,
+            merged,
+            on=['x_grid', 'y_grid', 'time', 'day'],
+            how='left'
+        ).fillna(0)
+        
+        dense_merged['pickup_count'] = dense_merged['pickup_count'].astype(int)
+        dense_merged['dropoff_count'] = dense_merged['dropoff_count'].astype(int)
+        
+        merged = dense_merged
     
     # Convert to dictionary format
     pickup_dropoff_counts = {}
