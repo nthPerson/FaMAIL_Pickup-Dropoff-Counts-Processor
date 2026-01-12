@@ -157,10 +157,10 @@ def main():
         
         x_offset = st.number_input(
             "x_grid offset",
-            value=2,
+            value=1,
             min_value=-5,
             max_value=5,
-            help="Add this value to x_grid indices (recommended: 2)"
+            help="Add this value to x_grid indices (recommended: 1)"
         )
         
         y_offset = st.number_input(

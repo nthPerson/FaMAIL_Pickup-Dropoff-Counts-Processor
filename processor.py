@@ -23,7 +23,7 @@ class ProcessingConfig:
     exclude_sunday: bool = True
     
     # Index offsets for alignment with existing dataset
-    x_grid_offset: int = 2  # Add 2 to x_grid indices
+    x_grid_offset: int = 1  # Add 2 to x_grid indices
     y_grid_offset: int = 1  # Add 1 to y_grid indices
     time_offset: int = 1    # Add 1 to time indices (0-based -> 1-based)
     
